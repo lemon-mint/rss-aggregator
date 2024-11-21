@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSS Aggregator - Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .views-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .views-list {
+            flex: 1;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .view-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background: white;
+        }
+        .view-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .feed-list {
+            margin-top: 10px;
+        }
+        .feed-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+        }
+        .feed-info {
+            flex-grow: 1;
+        }
+        .feed-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .feed-url {
+            color: #666;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+        .feed-actions {
+            margin-left: 10px;
+        }
+        .delete-btn {
+            background-color: #dc3545;
+        }
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+        .copy-btn {
+            background-color: #28a745;
+            margin-right: 5px;
+        }
+        .copy-btn:hover {
+            background-color: #218838;
+        }
+        .add-view {
+            margin-bottom: 20px;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RSS Aggregator Dashboard</h1>
+        
+        <div class="add-view">
+            <h2>Create New View</h2>
+            <form id="addViewForm">
+                <div class="form-group">
+                    <label for="viewName">View Name:</label>
+                    <input type="text" id="viewName" name="viewName" required>
+                </div>
+                <div class="form-group checkbox-group">
+                    <label for="viewPublic">Public:</label>
+                    <input type="checkbox" id="viewPublic" name="viewPublic">
+                </div>
+                <button type="submit">Create View</button>
+            </form>
+        </div>
+
+        <div class="add-feed">
+            <h2>Add New Feed</h2>
+            <form id="addFeedForm">
+                <div class="form-group">
+                    <label for="feedUrl">Feed URL:</label>
+                    <input type="url" id="feedUrl" name="feedUrl" required>
+                </div>
+                <div class="form-group">
+                    <label for="viewSelect">Add to View:</label>
+                    <select id="viewSelect" name="viewSelect" required>
+                        <!-- Views will be dynamically added here -->
+                    </select>
+                </div>
+                <button type="submit">Add Feed</button>
+            </form>
+            <div id="error" class="error"></div>
+            <div id="success" class="success"></div>
+        </div>
+
+        <div class="views-container">
+            <div class="views-list" id="viewsList">
+                <!-- Views will be dynamically added here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const addViewForm = document.getElementById('addViewForm');
+        const addFeedForm = document.getElementById('addFeedForm');
+        const errorDiv = document.getElementById('error');
+        const successDiv = document.getElementById('success');
+        const viewsList = document.getElementById('viewsList');
+        const viewSelect = document.getElementById('viewSelect');
+
+        // Load views when page loads
+        loadViews();
+
+        addViewForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('viewName').value;
+            const isPublic = document.getElementById('viewPublic').checked;
+
+            try {
+                const response = await fetch('/api/views', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, public: isPublic }),
+                });
+
+                if (response.ok) {
+                    successDiv.textContent = 'View created successfully';
+                    errorDiv.textContent = '';
+                    document.getElementById('viewName').value = '';
+                    document.getElementById('viewPublic').checked = false;
+                    loadViews();
+                } else {
+                    const data = await response.json();
+                    errorDiv.textContent = data.error || 'Failed to create view';
+                    successDiv.textContent = '';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred';
+                successDiv.textContent = '';
+            }
+        });
+
+        addFeedForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('feedUrl').value;
+            const viewId = document.getElementById('viewSelect').value;
+
+            try {
+                const response = await fetch('/api/feeds', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url, viewId: parseInt(viewId) }),
+                });
+
+                if (response.ok) {
+                    successDiv.textContent = 'Feed added successfully';
+                    errorDiv.textContent = '';
+                    document.getElementById('feedUrl').value = '';
+                    loadViews();
+                } else {
+                    const data = await response.json();
+                    errorDiv.textContent = data.error || 'Failed to add feed';
+                    successDiv.textContent = '';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred';
+                successDiv.textContent = '';
+            }
+        });
+
+        async function loadViews() {
+            try {
+                const response = await fetch('/api/views');
+                if (response.ok) {
+                    const views = await response.json();
+                    displayViews(views);
+                    updateViewSelect(views);
+                } else {
+                    errorDiv.textContent = 'Failed to load views';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred while loading views';
+            }
+        }
+
+        function updateViewSelect(views) {
+            viewSelect.innerHTML = '';
+            views.forEach(view => {
+                const option = document.createElement('option');
+                option.value = view.id;
+                option.textContent = view.name;
+                viewSelect.appendChild(option);
+            });
+        }
+
+        function displayViews(views) {
+            viewsList.innerHTML = '<h2>Your Views</h2>';
+            views.forEach(view => {
+                const viewElement = document.createElement('div');
+                viewElement.className = 'view-item';
+                viewElement.innerHTML = `
+                    <div class="view-title">
+                        <span>${view.name} ${view.public ? '(Public)' : '(Private)'}</span>
+                        <div class="feed-actions">
+                            <button class="copy-btn" onclick="copyViewUrl('${view.slug}')">Copy View URL</button>
+                            <button class="delete-btn" onclick="deleteView(${view.id})">Delete</button>
+                        </div>
+                    </div>
+                    <div class="feed-list" id="feedList-${view.id}">
+                        <!-- Feeds will be loaded here -->
+                    </div>
+                `;
+                viewsList.appendChild(viewElement);
+                loadViewFeeds(view.id);
+            });
+        }
+
+        async function loadViewFeeds(viewId) {
+            try {
+                const response = await fetch(`/api/views/${viewId}/feeds`);
+                if (response.ok) {
+                    const feeds = await response.json();
+                    displayViewFeeds(viewId, feeds);
+                } else {
+                    console.error('Failed to load feeds for view:', viewId);
+                }
+            } catch (error) {
+                console.error('Error loading feeds for view:', viewId, error);
+            }
+        }
+
+        function displayViewFeeds(viewId, feeds) {
+            const feedList = document.getElementById(`feedList-${viewId}`);
+            feedList.innerHTML = '';
+            feeds.forEach(feed => {
+                const feedElement = document.createElement('div');
+                feedElement.className = 'feed-item';
+                feedElement.innerHTML = `
+                    <div class="feed-info">
+                        <div class="feed-title">${feed.title}</div>
+                        <div class="feed-url">${feed.url}</div>
+                    </div>
+                    <div class="feed-actions">
+                        <button class="delete-btn" onclick="removeFeedFromView(${viewId}, ${feed.id})">Remove</button>
+                    </div>
+                `;
+                feedList.appendChild(feedElement);
+            });
+        }
+
+        async function deleteView(id) {
+            try {
+                const response = await fetch(`/api/views/${id}`, {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    successDiv.textContent = 'View deleted successfully';
+                    errorDiv.textContent = '';
+                    loadViews();
+                } else {
+                    const data = await response.json();
+                    errorDiv.textContent = data.error || 'Failed to delete view';
+                    successDiv.textContent = '';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred while deleting view';
+                successDiv.textContent = '';
+            }
+        }
+
+        async function removeFeedFromView(viewId, feedId) {
+            try {
+                const response = await fetch(`/api/views/${viewId}/feeds/${feedId}`, {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    successDiv.textContent = 'Feed removed from view successfully';
+                    errorDiv.textContent = '';
+                    loadViews();
+                } else {
+                    const data = await response.json();
+                    errorDiv.textContent = data.error || 'Failed to remove feed from view';
+                    successDiv.textContent = '';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred while removing feed';
+                successDiv.textContent = '';
+            }
+        }
+
+        function copyViewUrl(slug) {
+            const viewUrl = `${window.location.origin}/feed/${slug}`;
+            navigator.clipboard.writeText(viewUrl).then(() => {
+                successDiv.textContent = 'View URL copied to clipboard';
+                errorDiv.textContent = '';
+            }).catch(() => {
+                errorDiv.textContent = 'Failed to copy view URL';
+                successDiv.textContent = '';
+            });
+        }
+    </script>
+</body>
+</html>
